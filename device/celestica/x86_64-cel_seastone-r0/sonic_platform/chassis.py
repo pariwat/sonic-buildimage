@@ -17,20 +17,17 @@ import json
 try:
     from sonic_platform_base.chassis_base import ChassisBase
     from sonic_platform.fan import Fan
+    from sonic_platform.psu import Psu
+    from sonic_platform.device import Device
+    from sonic_platform.component import Component
 except ImportError as e:
     raise ImportError(str(e) + "- required module not found")
 
-BIOS_VERSION_PATH = "/sys/class/dmi/id/bios_version"
-GETREG_PATH = "/sys/devices/platform/dx010_cpld/getreg"
 CONFIG_DB_PATH = "/etc/sonic/config_db.json"
 NUM_FAN = 5
-CPLD_ADDR_MAPPING = {
-    "CPLD1": "0x100",
-    "CPLD2": "0x200",
-    "CPLD3": "0x280",
-    "CPLD4": "0x300",
-    "CPLD5": "0x380"
-}
+NUM_PSU = 2
+RESET_REGISTER = "0x103"
+REBOOT_CAUSE_PATH = "/host/reboot-cause/previous-reboot-cause.txt"
 
 
 class Chassis(ChassisBase):
@@ -41,17 +38,12 @@ class Chassis(ChassisBase):
         for index in range(0, NUM_FAN):
             fan = Fan(index)
             self._fan_list.append(fan)
+        for index in range(0, NUM_PSU):
+            psu = Psu(index)
+            self._psu_list.append(psu)
         ChassisBase.__init__(self)
-
-    def __get_register_value(self, path, register):
-        cmd = "echo {1} > {0}; cat {0}".format(path, register)
-        p = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        raw_data, err = p.communicate()
-        if err is not '':
-            return 'None'
-        else:
-            return raw_data.strip()
+        self._component_device = Device("component")
+        self._component_list = self._component_device.get_name_list()
 
     def __read_config_db(self):
         try:
@@ -60,6 +52,14 @@ class Chassis(ChassisBase):
                 return data
         except IOError:
             raise IOError("Unable to open config_db file !")
+
+    def __read_txt_file(self, file_path):
+        try:
+            with open(file_path, 'r') as fd:
+                data = fd.read()
+                return data.strip()
+        except IOError:
+            raise IOError("Unable to open %s file !" % file_path)
 
     def get_base_mac(self):
         """
@@ -75,35 +75,57 @@ class Chassis(ChassisBase):
         except KeyError:
             raise KeyError("Base MAC not found")
 
-    def get_component_versions(self):
+    def get_firmware_version(self, component_name):
         """
         Retrieves platform-specific hardware/firmware versions for chassis
         componenets such as BIOS, CPLD, FPGA, etc.
+        Args:
+            type: A string, component name
+
         Returns:
             A string containing platform-specific component versions
         """
+        self.component = Component(component_name)
+        if component_name not in self._component_list:
+            return None
+        return self.component.get_firmware_version()
 
-        component_versions = dict()
+    def install_component_firmware(self, component_name, image_path):
+        """
+        Install firmware to module
+        Args:
+            type: A string, component name.
+            image_path: A string, path to firmware image.
 
-        # Get BIOS version
-        try:
-            with open(BIOS_VERSION_PATH, 'r') as fd:
-                bios_version = fd.read()
-        except IOError:
-            raise IOError("Unable to open version file !")
+        Returns:
+            A boolean, True if install successfully, False if not
+        """
+        self.component = Component(component_name)
+        if component_name not in self._component_list:
+            return False
+        return self.component.upgrade_firmware(image_path)
 
-        # Get CPLD version
-        cpld_version = dict()
-        for cpld_name in CPLD_ADDR_MAPPING:
-            try:
-                cpld_addr = CPLD_ADDR_MAPPING[cpld_name]
-                cpld_version_raw = self.__get_register_value(
-                    GETREG_PATH, cpld_addr)
-                cpld_version_str = "{}.{}".format(int(cpld_version_raw[2], 16), int(
-                    cpld_version_raw[3], 16)) if cpld_version_raw is not None else 'None'
-                cpld_version[cpld_name] = cpld_version_str
-            except Exception, e:
-                cpld_version[cpld_name] = 'None'
-        component_versions["CPLD"] = cpld_version
-        component_versions["BIOS"] = bios_version.strip()
-        return str(component_versions)
+    def get_reboot_cause(self):
+        """
+        Retrieves the cause of the previous reboot
+
+        Returns:
+            A tuple (string, string) where the first element is a string
+            containing the cause of the previous reboot. This string must be
+            one of the predefined strings in this class. If the first string
+            is "REBOOT_CAUSE_HARDWARE_OTHER", the second string can be used
+            to pass a description of the reboot cause.
+        """
+        self.component = Component("CPLD1")
+        reboot_cause = self.REBOOT_CAUSE_HARDWARE_OTHER
+        hw_reboot_cause = self.component.get_register_value(RESET_REGISTER)
+        sw_reboot_cause = self.__read_txt_file(REBOOT_CAUSE_PATH)
+
+        if sw_reboot_cause != "Unexpected reboot":
+            reboot_cause = self.REBOOT_CAUSE_NON_HARDWARE
+        elif hw_reboot_cause == "0x11":
+            reboot_cause = self.REBOOT_CAUSE_POWER_LOSS
+        elif hw_reboot_cause == "0x22":
+            reboot_cause = self.REBOOT_CAUSE_WATCHDOG
+
+        return reboot_cause
