@@ -20,12 +20,16 @@ try:
     from sonic_platform.psu import Psu
     from sonic_platform.component import Component
     from sonic_platform.watchdog import Watchdog
+    from sonic_platform.thermal import Thermal
+    from sonic_platform.sfp import Sfp
 except ImportError as e:
     raise ImportError(str(e) + "- required module not found")
 
 CONFIG_DB_PATH = "/etc/sonic/config_db.json"
 NUM_FAN = 5
 NUM_PSU = 2
+NUM_THERMAL = 5
+NUM_SFP = 32
 RESET_REGISTER = "0x103"
 REBOOT_CAUSE_PATH = "/host/reboot-cause/previous-reboot-cause.txt"
 COMPONENT_NAME_LIST = ["CPLD1", "CPLD2", "CPLD3", "CPLD4", "BIOS"]
@@ -42,6 +46,12 @@ class Chassis(ChassisBase):
         for index in range(0, NUM_PSU):
             psu = Psu(index)
             self._psu_list.append(psu)
+        for index in range(0, NUM_THERMAL):
+            thermal = Thermal(index)
+            self._thermal_list.append(thermal)
+        for index in range(0, NUM_SFP):
+            sfp = Sfp(index)
+            self._sfp_list.append(sfp)
         ChassisBase.__init__(self)
         self._component_name_list = COMPONENT_NAME_LIST
         self._watchdog = Watchdog()
