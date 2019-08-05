@@ -22,6 +22,7 @@ try:
     from sonic_platform.watchdog import Watchdog
     from sonic_platform.thermal import Thermal
     from sonic_platform.sfp import Sfp
+    from sonic_platform.eeprom import Tlv
 except ImportError as e:
     raise ImportError(str(e) + "- required module not found")
 
@@ -55,14 +56,7 @@ class Chassis(ChassisBase):
         ChassisBase.__init__(self)
         self._component_name_list = COMPONENT_NAME_LIST
         self._watchdog = Watchdog()
-
-    def __read_config_db(self):
-        try:
-            with open(CONFIG_DB_PATH, 'r') as fd:
-                data = json.load(fd)
-                return data
-        except IOError:
-            raise IOError("Unable to open config_db file !")
+        self._tlv_eeprom = Tlv()
 
     def __read_txt_file(self, file_path):
         try:
@@ -79,12 +73,25 @@ class Chassis(ChassisBase):
             A string containing the MAC address in the format
             'XX:XX:XX:XX:XX:XX'
         """
-        try:
-            self.config_data = self.__read_config_db()
-            base_mac = self.config_data["DEVICE_METADATA"]["localhost"]["mac"]
-            return str(base_mac)
-        except KeyError:
-            return str(None)
+        return self._tlv_eeprom.get_mac()
+
+    def get_serial_number(self):
+        """
+        Retrieves the hardware serial number for the chassis
+        Returns:
+            A string containing the hardware serial number for this chassis.
+        """
+        return self._tlv_eeprom.get_serial()
+
+    def get_system_eeprom_info(self):
+        """
+        Retrieves the full content of system EEPROM information for the chassis
+        Returns:
+            A dictionary where keys are the type code defined in
+            OCP ONIE TlvInfo EEPROM format and values are their corresponding
+            values.
+        """
+        return self._tlv_eeprom.get_eeprom()
 
     def get_firmware_version(self, component_name):
         """
