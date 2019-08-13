@@ -138,9 +138,9 @@ class Chassis(ChassisBase):
         description = 'None'
         reboot_cause = self.REBOOT_CAUSE_HARDWARE_OTHER
         hw_reboot_cause = self.component.get_register_value(RESET_REGISTER)
-        sw_reboot_cause = self.__read_txt_file(REBOOT_CAUSE_PATH)
+        sw_reboot_cause = self.__read_txt_file(REBOOT_CAUSE_PATH) or "Unknown"
 
-        if sw_reboot_cause != "Unexpected reboot":
+        if sw_reboot_cause != "Unknown":
             reboot_cause = self.REBOOT_CAUSE_NON_HARDWARE
             description = sw_reboot_cause
         elif hw_reboot_cause == "0x11":

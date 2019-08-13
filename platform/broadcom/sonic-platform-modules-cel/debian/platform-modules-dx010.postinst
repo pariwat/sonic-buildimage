@@ -1,3 +1,5 @@
 depmod -a
 systemctl enable platform-modules-dx010.service
 systemctl start platform-modules-dx010.service
+
+/usr/local/bin/install_platform_api.sh install
