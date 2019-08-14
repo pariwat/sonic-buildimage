@@ -32,8 +32,10 @@ NUM_THERMAL = 7
 NUM_SFP = 52
 CONFIG_DB_PATH = "/etc/sonic/config_db.json"
 RESET_REGISTER = "0x112"
-REBOOT_CAUSE_PATH = "/host/reboot-cause/previous-reboot-cause.txt"
+HOST_REBOOT_CAUSE_PATH = "/host/reboot-cause/previous-reboot-cause.txt"
+PMON_REBOOT_CAUSE_PATH = "/usr/share/sonic/platform/api_files/reboot-cause/previous-reboot-cause.txt"
 COMPONENT_NAME_LIST = ["SMC_CPLD", "MMC_CPLD", "BIOS"]
+HOST_CHK_CMD = "docker > /dev/null 2>&1"
 
 
 class Chassis(ChassisBase):
@@ -54,9 +56,22 @@ class Chassis(ChassisBase):
             sfp = Sfp(index)
             self._sfp_list.append(sfp)
         ChassisBase.__init__(self)
+        self._reboot_cause_path = HOST_REBOOT_CAUSE_PATH if self.__is_host(
+        ) else PMON_REBOOT_CAUSE_PATH
         self._component_name_list = COMPONENT_NAME_LIST
         self._watchdog = Watchdog()
         self._tlv_eeprom = Tlv()
+
+    def __read_txt_file(self, file_path):
+        try:
+            with open(file_path, 'r') as fd:
+                data = fd.read()
+                return data.strip()
+        except IOError:
+            raise IOError("Unable to open %s file !" % file_path)
+
+    def __is_host(self):
+        return os.system(HOST_CHK_CMD) == 0
 
     def __read_txt_file(self, file_path):
         try:
@@ -138,7 +153,8 @@ class Chassis(ChassisBase):
         description = 'None'
         reboot_cause = self.REBOOT_CAUSE_HARDWARE_OTHER
         hw_reboot_cause = self.component.get_register_value(RESET_REGISTER)
-        sw_reboot_cause = self.__read_txt_file(REBOOT_CAUSE_PATH) or "Unknown"
+        sw_reboot_cause = self.__read_txt_file(
+            self._reboot_cause_path) or "Unknown"
 
         if sw_reboot_cause != "Unknown":
             reboot_cause = self.REBOOT_CAUSE_NON_HARDWARE
