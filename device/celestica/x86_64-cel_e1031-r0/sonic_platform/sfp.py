@@ -127,7 +127,7 @@ class Sfp(SfpBase, SfpUtilBase):
         self.port_num = self.index + 1
 
     def __is_host(self):
-        return os.system(HOST_CHK_CMD) == 0
+        return os.system(self.HOST_CHK_CMD) == 0
 
     def __get_sysfsfile_eeprom(self):
         sysfsfile_eeprom = None
