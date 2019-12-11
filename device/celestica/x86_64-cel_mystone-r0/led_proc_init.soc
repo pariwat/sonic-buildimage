@@ -1,0 +1,16 @@
+#Enable all ports
+#port all en=1
+#sleep 6
+#linkscan 250000; port xe,ce linkscan=on
+
+#Load LED
+#sleep 10
+#vlan clear
+#sleep 5
+#vlan add 1 pbm=xe,cpu ubm=xe,cpu
+#sleep 5
+#led auto on; led start
+sleep 5
+port xe48,xe49,ce en=1
+port xe48,xe49 an=1
+vlan create 250 pbm=xe48,xe49 ubm=xe48,xe49

@@ -1,3 +1,10 @@
+sonic-cel-platform-modules (1.0) unstable; urgency=low
+
+  * Add Mystone platform.
+  * Upgrade linux kernel to version 4.9
+
+ -- Wirut Getbamrung <wgetbumr@celestica.com>  Mon, 28 Jan 2019 10:45:15 +0700
+
 sonic-cel-platform-modules (0.9) unstable; urgency=low
 
   * Add haliburton platform module.
