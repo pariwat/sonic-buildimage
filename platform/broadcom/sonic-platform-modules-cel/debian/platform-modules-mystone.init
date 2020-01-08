@@ -15,16 +15,58 @@ case "$1" in
 start)
         echo -n "Setting up board... "
 
-        # Add driver to support HW
+        # Loads kernel modules
         modprobe i2c-dev
         modprobe dimm-bus
+        modprobe pmbus_core
         modprobe i2c-imc allow_unsafe_access=1
         modprobe baseboard_cpld
-        modprobe switchboard_fpga
+        modprobe switchboard_fpga allow_unsafe_i2c_access=1
         modprobe mc24lc64t
+        modprobe i2c_dev_sysfs
+        modprobe syscpld
+        modprobe fancpld
+        modprobe dps1100
 
         # Add driver to support TLV - EEPROM
         echo 24lc64t 0x56 > /sys/bus/i2c/devices/i2c-0/new_device
+
+        # Init the PCA9548 on FAN, PSU, and Power busses.
+        echo pca9548 0x77 > /sys/bus/i2c/devices/i2c-66/new_device
+        echo pca9548 0x77 > /sys/bus/i2c/devices/i2c-68/new_device
+        echo pca9548 0x77 > /sys/bus/i2c/devices/i2c-71/new_device
+
+        #
+        # Here if we create syscpld before dps1100, The dps1100 will fails.
+        # (Known issue: pmbus_do_probe create unwanted sysfs)
+        # To avoid it, we need to create the syscpld device after psu devices.
+        #
+        ## Populate FAN CPLD device
+        echo fancpld 0x0d > /sys/bus/i2c/devices/i2c-66/new_device
+        
+        ## Populate PSU PMBus and System CPLD devices
+        echo dps1100 0x58 > /sys/bus/i2c/devices/i2c-75/new_device
+        echo dps1100 0x59 > /sys/bus/i2c/devices/i2c-76/new_device
+        echo syscpld 0x0d > /sys/bus/i2c/devices/i2c-70/new_device
+        
+        # Populate temperature sensors
+        echo lm75b 0x48 > /sys/bus/i2c/devices/i2c-9/new_device
+        echo lm75b 0x4d > /sys/bus/i2c/devices/i2c-67/new_device
+
+        # Populate EEPROM
+        ## FAN
+        echo 24lc64t 0x50 > /sys/bus/i2c/devices/i2c-2/new_device
+        echo 24lc64t 0x50 > /sys/bus/i2c/devices/i2c-4/new_device
+        echo 24lc64t 0x50 > /sys/bus/i2c/devices/i2c-6/new_device
+        echo 24lc64t 0x50 > /sys/bus/i2c/devices/i2c-8/new_device
+        echo 24lc64t 0x56 > /sys/bus/i2c/devices/i2c-9/new_device
+        
+        ## PSU 
+        echo 24lc64t 0x50 > /sys/bus/i2c/devices/i2c-75/new_device
+        echo 24lc64t 0x51 > /sys/bus/i2c/devices/i2c-76/new_device
+        
+        ## SYSTEM
+        echo 24lc64t 0x57 > /sys/bus/i2c/devices/i2c-69/new_device
 
         echo "done."
         ;;
