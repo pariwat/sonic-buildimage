@@ -36,18 +36,15 @@ start)
         echo pca9548 0x77 > /sys/bus/i2c/devices/i2c-68/new_device
         echo pca9548 0x77 > /sys/bus/i2c/devices/i2c-71/new_device
 
-        #
-        # Here if we create syscpld before dps1100, The dps1100 will fails.
-        # (Known issue: pmbus_do_probe create unwanted sysfs)
-        # To avoid it, we need to create the syscpld device after psu devices.
-        #
         ## Populate FAN CPLD device
         echo fancpld 0x0d > /sys/bus/i2c/devices/i2c-66/new_device
         
+        ## Populate SYSTEM cpld device
+        echo syscpld 0x0d > /sys/bus/i2c/devices/i2c-70/new_device
+
         ## Populate PSU PMBus and System CPLD devices
         echo dps1100 0x58 > /sys/bus/i2c/devices/i2c-75/new_device
         echo dps1100 0x59 > /sys/bus/i2c/devices/i2c-76/new_device
-        echo syscpld 0x0d > /sys/bus/i2c/devices/i2c-70/new_device
         
         # Populate temperature sensors
         echo lm75b 0x48 > /sys/bus/i2c/devices/i2c-9/new_device

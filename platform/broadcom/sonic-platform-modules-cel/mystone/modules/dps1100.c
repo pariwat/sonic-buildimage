@@ -768,6 +768,34 @@ static int dps1100_pmbus_read_word_data(struct i2c_client *client, int page, int
 {
 	int ret;
 
+	/*
+	 * This mask out the auto probe sensor limits,
+	 * Since we want to use our custom limits.
+	 */
+	if (reg >= PMBUS_VIRT_BASE
+		|| reg == PMBUS_VIN_UV_WARN_LIMIT
+		|| reg == PMBUS_VIN_UV_FAULT_LIMIT
+		|| reg == PMBUS_VIN_OV_WARN_LIMIT
+		|| reg == PMBUS_VIN_OV_FAULT_LIMIT
+		|| reg == PMBUS_VOUT_UV_WARN_LIMIT
+		|| reg == PMBUS_VOUT_UV_FAULT_LIMIT
+		|| reg == PMBUS_VOUT_OV_FAULT_LIMIT
+		|| reg == PMBUS_VOUT_OV_WARN_LIMIT
+		|| reg == PMBUS_IIN_OC_WARN_LIMIT
+		|| reg == PMBUS_IIN_OC_FAULT_LIMIT
+		|| reg == PMBUS_IOUT_OC_WARN_LIMIT
+		|| reg == PMBUS_IOUT_UC_FAULT_LIMIT
+		|| reg == PMBUS_IOUT_OC_FAULT_LIMIT
+		|| reg == PMBUS_PIN_OP_WARN_LIMIT
+		|| reg == PMBUS_POUT_MAX
+		|| reg == PMBUS_POUT_OP_WARN_LIMIT
+		|| reg == PMBUS_POUT_OP_FAULT_LIMIT
+		|| reg == PMBUS_UT_WARN_LIMIT
+		|| reg == PMBUS_UT_FAULT_LIMIT
+		|| reg == PMBUS_OT_WARN_LIMIT
+		|| reg == PMBUS_OT_FAULT_LIMIT)
+		return -ENXIO;
+
 	if (dps1100_ok(client) != 1)
 		return -1;
 	ret = pmbus_read_word_data(client, page, reg);
@@ -844,8 +872,6 @@ static int dps1100_probe(struct i2c_client *client,
 	                | PMBUS_HAVE_IIN
 	                | PMBUS_HAVE_TEMP2;
 
-	// TODO: Mask the unwanted limit attrs in the read_word_data callback.
-	//        These duplicated with psu_attr_table list when do probing.
 	info->read_word_data = dps1100_pmbus_read_word_data;
 	info->write_word_data = dps1100_pmbus_write_word_data;
 	info->read_byte_data = dps1100_pmbus_read_byte_data;
@@ -889,6 +915,6 @@ module_i2c_driver(dps1100_driver);
 
 MODULE_AUTHOR("Micky Zhan, based on work by Guenter Roeck");
 MODULE_DESCRIPTION("PMBus driver for DPS1100");
-MODULE_VERSION("0.0.1");
+MODULE_VERSION("0.0.2");
 MODULE_LICENSE("GPL");
 
