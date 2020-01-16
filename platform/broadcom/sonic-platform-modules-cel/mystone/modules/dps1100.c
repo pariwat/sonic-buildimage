@@ -445,8 +445,7 @@ static ssize_t dps1100_reg_word_store(struct device *dev,
 	return count;
 }
 
-
-static const struct i2c_dev_attr_t psu_attr_table[] = {
+static struct i2c_dev_attr_t psu_attr_table[] = {
 	{
 		"in1_min",
 		NULL,
@@ -591,19 +590,18 @@ static const struct i2c_dev_attr_t psu_attr_table[] = {
 };
 
 
-
 static struct pmbus_platform_data platform_data = {
 	.flags = PMBUS_SKIP_STATUS_CHECK,
 };
 
-static int sysfs_value_rw(int *reg, int opcode, int val)
+static int sysfs_value_rw(unsigned int *reg, int opcode, int val)
 {
 	if (opcode == SYSFS_READ)
 		return *reg;
 	else if (opcode == SYSFS_WRITE)
 		*reg = val;
 	else
-		return -1;
+		return -EINVAL;
 
 	return 0;
 }
@@ -646,10 +644,11 @@ static ssize_t i2c_dev_sysfs_store(struct device *dev,
 		return dev_attr->store(dev, attr, buf, count);
 	}
 
-	/* parse the buffer */
-	if (sscanf(buf, "%i", &val) <= 0) {
+	ret = kstrtouint(buf, 0, &val);
+	if (ret != 0)	{
 		return -EINVAL;
 	}
+
 	ret = sysfs_value_rw(&dev_attr->reg, SYSFS_WRITE, val);
 	if (ret < 0) {
 		return ret;
@@ -678,14 +677,14 @@ static int i2c_dev_sysfs_data_clean(struct device *dev, struct dps1100_data *dat
 
 static int dps1100_register_sysfs(struct device *dev,
                                   struct dps1100_data *data,
-                                  const struct i2c_dev_attr_t *dev_attrs,
+                                  struct i2c_dev_attr_t *dev_attrs,
                                   int n_attrs)
 {
 	int i;
 	int ret;
 	mode_t mode;
 	struct sysfs_attr_t *cur_attr;
-	const struct i2c_dev_attr_t *cur_dev_attr;
+	struct i2c_dev_attr_t *cur_dev_attr;
 	struct attribute **cur_grp_attr;
 
 	data->sysfs_attr = kzalloc(sizeof(*data->sysfs_attr) * n_attrs, GFP_KERNEL);
@@ -915,6 +914,5 @@ module_i2c_driver(dps1100_driver);
 
 MODULE_AUTHOR("Micky Zhan, based on work by Guenter Roeck");
 MODULE_DESCRIPTION("PMBus driver for DPS1100");
-MODULE_VERSION("0.0.2");
+MODULE_VERSION("0.0.3");
 MODULE_LICENSE("GPL");
-
