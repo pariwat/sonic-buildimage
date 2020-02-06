@@ -159,7 +159,7 @@ class SfpUtil(SfpUtilBase):
         """
         TBD
         """
-        return NotImplementedError
+        raise NotImplementedError
 
     def tx_disable(self, port_num, disable):
         """
