@@ -3,6 +3,8 @@
 # Platform-specific SFP transceiver interface for SONiC
 #
 
+__version__ = "0.0.1"
+
 try:
     import time
     from sonic_sfp.sfputilbase import SfpUtilBase
