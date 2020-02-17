@@ -8,7 +8,7 @@
 # Should-Stop:
 # Default-Start:     S
 # Default-Stop:      0 6
-# Short-Description: Setup mystone board.
+# Short-Description: Setup questone2bd board.
 ### END INIT INFO
 
 case "$1" in
@@ -77,7 +77,7 @@ force-reload|restart)
         ;;
 
 *)
-        echo "Usage: /etc/init.d/platform-modules-mystone.init {start|stop}"
+        echo "Usage: /etc/init.d/platform-modules-questone2bd.init {start|stop}"
         exit 1
         ;;
 esac

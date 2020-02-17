@@ -20,7 +20,7 @@ Architecture: amd64
 Depends: linux-image-4.9.0-9-2-amd64
 Description: kernel modules for platform devices such as led, sfp.
 
-Package: platform-modules-mystone
+Package: platform-modules-questone2bd
 Architecture: amd64
 Depends: linux-image-4.9.0-9-2-amd64
 Description: kernel modules for platform devices such as fan, led, sfp

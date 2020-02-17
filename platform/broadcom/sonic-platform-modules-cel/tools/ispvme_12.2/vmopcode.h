@@ -179,7 +179,7 @@
 #define DNV_GPIO_LVL_HIGH   1
 #define DNV_GPIO_LVL_LOW    0
 
-// FIXME: This only works on mystone
+// FIXME: This only works on questone2bd
 #define CPU_FREQ_MH_CONFIG 2200 /* in MHz */
 #define GPIO_USE_SEL	0x500
 #define GP_IO_SEL		0x504

@@ -162,7 +162,7 @@ static ssize_t sys_alarm_store(struct device *dev,
 }
 
 static i2c_dev_data_st syscpld_data;
-static const i2c_dev_attr_st syscpld_attr_table_mystone[] = {
+static const i2c_dev_attr_st syscpld_attr_table_questone2bd[] = {
 	{
 		"version",
 		NULL,
@@ -188,7 +188,7 @@ static const i2c_dev_attr_st syscpld_attr_table_mystone[] = {
 		"sw_brd_type",
 		"Indicate the board type\n"
 		"0x00: fishbone32\n"
-		"0x01: mystone",
+		"0x01: questone2bd",
 		I2C_DEV_ATTR_SHOW_DEFAULT,
 		NULL,
 		0x3, 0, 2,
@@ -708,9 +708,9 @@ static int syscpld_probe(struct i2c_client *client,
 		dev_err(&client->dev, "Cannot read board type.\n");
 		return board_type;
 	} else {
-		printk(KERN_INFO "Mystone CPLD driver loading\n");
-		n_attrs = sizeof(syscpld_attr_table_mystone) / sizeof(syscpld_attr_table_mystone[0]);
-		syscpld_attr_table = syscpld_attr_table_mystone;
+		printk(KERN_INFO "Questone2bd CPLD driver loading\n");
+		n_attrs = sizeof(syscpld_attr_table_questone2bd) / sizeof(syscpld_attr_table_questone2bd[0]);
+		syscpld_attr_table = syscpld_attr_table_questone2bd;
 	}
 
 	return i2c_dev_sysfs_data_init(client, &syscpld_data, syscpld_attr_table, n_attrs);

@@ -1,6 +1,6 @@
-mystone/cfg/mystone-modules.conf etc/modules-load.d
-mystone/cfg/mystone-modprobe.conf etc/modprobe.d
-mystone/systemd/platform-modules-mystone.service lib/systemd/system
+questone2bd/cfg/questone2bd-modules.conf etc/modules-load.d
+questone2bd/cfg/questone2bd-modprobe.conf etc/modprobe.d
+questone2bd/systemd/platform-modules-questone2bd.service lib/systemd/system
 tools/sync_bmc/bmc_vlan.service etc/systemd/system
 tools/sync_bmc/sync_bmc.service etc/systemd/system
 tools/sync_bmc/sync_bmc.timer etc/systemd/system

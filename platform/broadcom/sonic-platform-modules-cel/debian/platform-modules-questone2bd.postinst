@@ -3,8 +3,8 @@ depmod -a
 # Enable bmc vlan_ip service
 #systemctl enable bmc_vlan.service
 
-systemctl enable platform-modules-mystone.service
-systemctl start platform-modules-mystone.service
+systemctl enable platform-modules-questone2bd.service
+systemctl start platform-modules-questone2bd.service
 
 # Enable platform-sync_bmc-timer
 #systemctl enable sync_bmc.timer

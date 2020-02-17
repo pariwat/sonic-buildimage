@@ -1,5 +1,5 @@
 /*
- * switchboard.c - Driver for mystone Switch FPGA/CPLD.
+ * switchboard.c - Driver for questone2bd Switch FPGA/CPLD.
  *
  * Author: Pradchaya Phucharoen
  *
@@ -14,7 +14,7 @@
  *   \--sys
  *       \--devices
  *            \--platform
- *                \--mystone.switchboard
+ *                \--questone2bd.switchboard
  *                    |--FPGA
  *                    |--CPLD1
  *                    |--CPLD2
@@ -56,9 +56,9 @@
 
 static int  majorNumber;
 
-#define CLASS_NAME "mystone_fpga"
-#define DRIVER_NAME "mystone.switchboard"
-#define FPGA_PCI_NAME "mystone_fpga_pci"
+#define CLASS_NAME "questone2bd_fpga"
+#define DRIVER_NAME "questone2bd.switchboard"
+#define FPGA_PCI_NAME "questone2bd_fpga_pci"
 #define DEVICE_NAME "fwupgrade"
 
 static bool allow_unsafe_i2c_access;
@@ -459,7 +459,7 @@ static struct fpga_device fpga_dev = {
     .data_mmio_len = 0,
 };
 
-struct mystone_fpga_data {
+struct questone2bd_fpga_data {
     struct device *sff_devices[SFF_PORT_TOTAL];
     struct i2c_client *sff_i2c_clients[SFF_PORT_TOTAL];
     struct i2c_adapter *i2c_adapter[VIRTUAL_I2C_PORT_LENGTH];
@@ -474,7 +474,7 @@ struct sff_device_data {
     enum PORT_TYPE port_type;
 };
 
-struct mystone_fpga_data *fpga_data;
+struct questone2bd_fpga_data *fpga_data;
 
 /*
  * Kernel object for other module drivers.
@@ -1112,7 +1112,7 @@ static struct attribute_group sff_led_test_grp = {
     .attrs = sff_led_test,
 };
 
-static struct device * mystone_sff_init(int portid) {
+static struct device * questone2bd_sff_init(int portid) {
     struct sff_device_data *new_data;
     struct device *new_device;
 
@@ -1779,7 +1779,7 @@ static int fpga_i2c_access(struct i2c_adapter *adapter, u16 addr,
         dev_err(&adapter->dev, "I2C bus hangup detected on %s port.\n", calling_name);
 
         /**
-         * mystone: Device specific I2C reset topology
+         * questone2bd: Device specific I2C reset topology
          */
         if( master_bus == I2C_MASTER_CH_11 || master_bus == I2C_MASTER_CH_12 ){
             dev_notice(&adapter->dev, "Trying bus recovery...\n");
@@ -1822,7 +1822,7 @@ static u32 fpga_i2c_func(struct i2c_adapter *a)
            I2C_FUNC_SMBUS_I2C_BLOCK;
 }
 
-static const struct i2c_algorithm mystone_i2c_algorithm = {
+static const struct i2c_algorithm questone2bd_i2c_algorithm = {
     .smbus_xfer = fpga_i2c_access,
     .functionality  = fpga_i2c_func,
 };
@@ -1837,7 +1837,7 @@ static const struct i2c_algorithm mystone_i2c_algorithm = {
  * When bus_number_offset is -1, created adapter with dynamic bus number.
  * Otherwise create adapter at i2c bus = bus_number_offset + portid.
  */
-static struct i2c_adapter * mystone_i2c_init(struct platform_device *pdev, int portid, int bus_number_offset)
+static struct i2c_adapter * questone2bd_i2c_init(struct platform_device *pdev, int portid, int bus_number_offset)
 {
     int error;
 
@@ -1852,7 +1852,7 @@ static struct i2c_adapter * mystone_i2c_init(struct platform_device *pdev, int p
 
     new_adapter->owner = THIS_MODULE;
     new_adapter->class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
-    new_adapter->algo  = &mystone_i2c_algorithm;
+    new_adapter->algo  = &questone2bd_i2c_algorithm;
     /* If the bus offset is -1, use dynamic bus number */
     if (bus_number_offset == -1) {
         new_adapter->nr = -1;
@@ -1889,7 +1889,7 @@ static struct i2c_adapter * mystone_i2c_init(struct platform_device *pdev, int p
 };
 
 // I/O resource need.
-static struct resource mystone_resources[] = {
+static struct resource questone2bd_resources[] = {
     {
         .start  = 0x10000000,
         .end    = 0x10001000,
@@ -1897,18 +1897,18 @@ static struct resource mystone_resources[] = {
     },
 };
 
-static void mystone_dev_release( struct device * dev)
+static void questone2bd_dev_release( struct device * dev)
 {
     return;
 }
 
-static struct platform_device mystone_dev = {
+static struct platform_device questone2bd_dev = {
     .name           = DRIVER_NAME,
     .id             = -1,
-    .num_resources  = ARRAY_SIZE(mystone_resources),
-    .resource       = mystone_resources,
+    .num_resources  = ARRAY_SIZE(questone2bd_resources),
+    .resource       = questone2bd_resources,
     .dev = {
-        .release = mystone_dev_release,
+        .release = questone2bd_dev_release,
     }
 };
 
@@ -1922,7 +1922,7 @@ static struct i2c_board_info sff8436_eeprom_info[] = {
     { I2C_BOARD_INFO("optoe2", 0x50) }, //For SFP+ w/ sff8472
 };
 
-static int mystone_drv_probe(struct platform_device *pdev)
+static int questone2bd_drv_probe(struct platform_device *pdev)
 {
     struct resource *res;
     int ret = 0;
@@ -1934,7 +1934,7 @@ static int mystone_drv_probe(struct platform_device *pdev)
     /* The device class need to be instantiated before this function called */
     BUG_ON(fpgafwclass == NULL);
 
-    fpga_data = devm_kzalloc(&pdev->dev, sizeof(struct mystone_fpga_data),
+    fpga_data = devm_kzalloc(&pdev->dev, sizeof(struct questone2bd_fpga_data),
                              GFP_KERNEL);
 
     if (!fpga_data)
@@ -2080,14 +2080,14 @@ static int mystone_drv_probe(struct platform_device *pdev)
                 continue;
             }
         }
-        fpga_data->i2c_adapter[portid_count] = mystone_i2c_init(pdev, portid_count, VIRTUAL_I2C_BUS_OFFSET);
+        fpga_data->i2c_adapter[portid_count] = questone2bd_i2c_init(pdev, portid_count, VIRTUAL_I2C_BUS_OFFSET);
     }
 
     /* Init SFF devices */
     for (portid_count = 0; portid_count < SFF_PORT_TOTAL; portid_count++) {
         struct i2c_adapter *i2c_adap = fpga_data->i2c_adapter[portid_count];
         if (i2c_adap) {
-            fpga_data->sff_devices[portid_count] = mystone_sff_init(portid_count);
+            fpga_data->sff_devices[portid_count] = questone2bd_sff_init(portid_count);
             sff_data = dev_get_drvdata(fpga_data->sff_devices[portid_count]);
             BUG_ON(sff_data == NULL);
             if ( sff_data->port_type == QSFP ) {
@@ -2145,7 +2145,7 @@ static int mystone_drv_probe(struct platform_device *pdev)
     return 0;
 }
 
-static int mystone_drv_remove(struct platform_device *pdev)
+static int questone2bd_drv_remove(struct platform_device *pdev)
 {
     int portid_count;
     struct sff_device_data *rem_data;
@@ -2194,9 +2194,9 @@ static int mystone_drv_remove(struct platform_device *pdev)
     return 0;
 }
 
-static struct platform_driver mystone_drv = {
-    .probe  = mystone_drv_probe,
-    .remove = __exit_p(mystone_drv_remove),
+static struct platform_driver questone2bd_drv = {
+    .probe  = questone2bd_drv_probe,
+    .remove = __exit_p(questone2bd_drv_remove),
     .driver = {
         .name   = DRIVER_NAME,
     },
@@ -2257,8 +2257,8 @@ static int fpga_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     fpga_version = ioread32(fpga_dev.data_base_addr);
     printk(KERN_INFO "FPGA Version : %8.8x\n", fpga_version);
     fpgafw_init();
-    platform_device_register(&mystone_dev);
-    platform_driver_register(&mystone_drv);
+    platform_device_register(&questone2bd_dev);
+    platform_driver_register(&questone2bd_drv);
     return 0;
 
 pci_release:
@@ -2270,8 +2270,8 @@ pci_disable:
 
 static void fpga_pci_remove(struct pci_dev *pdev)
 {
-    platform_driver_unregister(&mystone_drv);
-    platform_device_unregister(&mystone_dev);
+    platform_driver_unregister(&questone2bd_drv);
+    platform_device_unregister(&questone2bd_dev);
     fpgafw_exit();
     pci_iounmap(pdev, fpga_dev.data_base_addr);
     pci_release_regions(pdev);
@@ -2405,7 +2405,7 @@ static void fpgafw_exit(void) {
     printk(KERN_INFO "Goodbye!\n");
 }
 
-int mystone_init(void)
+int questone2bd_init(void)
 {
     int rc;
     rc = pci_register_driver(&pci_dev_ops);
@@ -2414,18 +2414,18 @@ int mystone_init(void)
     return 0;
 }
 
-void mystone_exit(void)
+void questone2bd_exit(void)
 {
     pci_unregister_driver(&pci_dev_ops);
 }
 
-module_init(mystone_init);
-module_exit(mystone_exit);
+module_init(questone2bd_init);
+module_exit(questone2bd_exit);
 
 module_param(allow_unsafe_i2c_access, bool, 0400);
 MODULE_PARM_DESC(allow_unsafe_i2c_access, "enable i2c busses despite potential races against BMC bus access");
 
 MODULE_AUTHOR("Pradchaya P. <pphuchar@celestica.com>");
-MODULE_DESCRIPTION("Celestica mystone switchboard platform driver");
+MODULE_DESCRIPTION("Celestica questone2bd switchboard platform driver");
 MODULE_VERSION(MOD_VERSION);
 MODULE_LICENSE("GPL");

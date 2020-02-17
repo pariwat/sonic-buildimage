@@ -19,7 +19,7 @@ class SfpUtil(SfpUtilBase):
     QSFP_PORT_END = 56
 
     EEPROM_OFFSET = 9
-    PORT_INFO_PATH = '/sys/class/mystone_fpga'
+    PORT_INFO_PATH = '/sys/class/questone2bd_fpga'
 
     _port_name = ""
     _port_to_eeprom_mapping = {}

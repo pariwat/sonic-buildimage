@@ -1,6 +1,6 @@
 /*
- * cpld_b.c - The CPLD driver for the Base Board of mystone
- * The driver implement sysfs to access CPLD register on the baseboard of mystone via LPC bus.
+ * cpld_b.c - The CPLD driver for the Base Board of questone2bd
+ * The driver implement sysfs to access CPLD register on the baseboard of questone2bd via LPC bus.
  * Copyright (C) 2018 Celestica Corp.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -29,7 +29,7 @@
 #include <uapi/linux/stat.h>
 #include <linux/string.h>
 
-#define DRIVER_NAME "mystone.cpldb"
+#define DRIVER_NAME "questone2bd.cpldb"
 /**
  * CPLD register address for read and write.
  */
@@ -412,6 +412,6 @@ module_exit(cpld_b_exit);
 
 
 MODULE_AUTHOR("Pradchaya P. <pphuchar@celestica.com>");
-MODULE_DESCRIPTION("Celestica mystone CPLD baseboard driver");
+MODULE_DESCRIPTION("Celestica questone2bd CPLD baseboard driver");
 MODULE_VERSION("0.0.2");
 MODULE_LICENSE("GPL");
