@@ -54,9 +54,9 @@ class Psu(PsuBase):
     def __init__(self, psu_index):
         PsuBase.__init__(self)
         self.index = psu_index
-        # for fan_index in range(0, PSU_NUM_FAN[self.index]):
-        #     fan = Fan(fan_index, 0, is_psu_fan=True, psu_index=self.index)
-        #     self._fan_list.append(fan)
+        for fan_index in range(0, PSU_NUM_FAN[self.index]):
+            fan = Fan(fan_index, 0, is_psu_fan=True, psu_index=self.index)
+            self._fan_list.append(fan)
         self.hwmon_path = HWMON_PATH.format(
             PSU_INFO_MAPPING[self.index]["i2c_num"], PSU_INFO_MAPPING[self.index]["pmbus_reg"])
         self._api_helper = APIHelper()
@@ -75,10 +75,6 @@ class Psu(PsuBase):
         psu_status_bin = self._api_helper.hex_to_bin(psu_status_raw)
         return str(psu_status_bin)[2:][::-1]
 
-    # def __get_eeprom(self):
-    #     i2c_num = PSU_INFO_MAPPING[self.index]["i2c_num"]
-    #     reg_num = PSU_INFO_MAPPING[self.index]["eeprom_reg"]
-    #     return Eeprom(i2c_num, reg_num)
 
     def get_voltage(self):
         """
