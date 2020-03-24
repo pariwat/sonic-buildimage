@@ -40,7 +40,7 @@ class Chassis(ChassisBase):
 
     def __init__(self):
         ChassisBase.__init__(self)
-        self.config_data = {}
+
         self._eeprom = Eeprom(TLV_EEPROM_I2C_BUS, TLV_EEPROM_I2C_ADDR)
         self._api_helper = APIHelper()
 
@@ -52,7 +52,7 @@ class Chassis(ChassisBase):
             for fan_index in range(0, NUM_FAN):
                 fan = Fan(fant_index, fan_index)
                 self._fan_list.append(fan)
-                
+
         # for index in range(0, NUM_SFP):
         #     sfp = Sfp(index)
         #     self._sfp_list.append(sfp)

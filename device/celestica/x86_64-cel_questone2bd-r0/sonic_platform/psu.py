@@ -53,6 +53,7 @@ class Psu(PsuBase):
 
     def __init__(self, psu_index):
         PsuBase.__init__(self)
+
         self.index = psu_index
         for fan_index in range(0, PSU_NUM_FAN[self.index]):
             fan = Fan(fan_index, 0, is_psu_fan=True, psu_index=self.index)
