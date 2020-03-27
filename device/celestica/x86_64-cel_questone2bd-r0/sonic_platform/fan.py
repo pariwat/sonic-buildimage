@@ -82,56 +82,6 @@ class Fan(FanBase):
                     return dirpath
         return None
 
-    def __read_eeprom_sysfs(self,sys_path,sysfs_file):
-        sysfs_path = os.path.join(sys_path, sysfs_file)
-        try:
-            with open(sysfs_path, 'rb') as fd:
-                data = fd.read()
-                return data
-        except IOError:
-            raise IOError("Unable to open %s file !" % file_path)
-        return False
-
-    def __fru_decode_product_serial(self, data):
-        if data[4] != 00:
-            start_product_info = ord(data[4]) * 8
-            start_format_version = start_product_info
-            start_product_info = start_format_version + 1
-            start_product_Lang_code = start_product_info + 1
-            start_product_Manu_name = start_product_Lang_code + 1
-            start_product_Manu_name_length = ord(data[start_product_Manu_name]) & 0x0F
-            start_product_name =  start_product_Manu_name + start_product_Manu_name_length + 1
-            start_product_name_length = ord(data[start_product_name]) & 0x0F
-            start_product_module_number = start_product_name + start_product_name_length +1
-            start_product_module_number_length = ord(data[start_product_module_number]) & 0x0F
-            start_product_version = start_product_module_number + start_product_module_number_length +1
-            start_product_version_length = ord(data[start_product_version]) & 0x0F
-            start_product_serial_number = start_product_version + start_product_version_length +1
-            start_product_serial_number_length = ord(data[start_product_serial_number]) & 0x1F
-            return data[start_product_serial_number+1:start_product_serial_number+start_product_serial_number_length+1]
-        else:
-            return None
-
-    def __fru_decode_product_model(self, data):
-        if data[4] != 00:
-            start_product_info = ord(data[4]) * 8
-            start_format_version = start_product_info
-            start_product_info = start_format_version + 1
-            start_product_Lang_code = start_product_info + 1
-            start_product_Manu_name = start_product_Lang_code + 1
-            start_product_Manu_name_length = ord(data[start_product_Manu_name]) & 0x0F
-            start_product_name =  start_product_Manu_name + start_product_Manu_name_length + 1
-            start_product_name_length = ord(data[start_product_name]) & 0x0F
-            start_product_module_number = start_product_name + start_product_name_length +1
-            start_product_module_number_length = ord(data[start_product_module_number]) & 0x0F
-            start_product_version = start_product_module_number + start_product_module_number_length +1
-            start_product_version_length = ord(data[start_product_version]) & 0x0F
-            start_product_serial_number = start_product_version + start_product_version_length +1
-            start_product_serial_number_length = ord(data[start_product_serial_number]) & 0x1F
-            return data[start_product_module_number+1:start_product_module_number+start_product_module_number_length+1]
-        else:
-            return None
-
     def get_direction(self):
         """
         Retrieves the direction of fan
@@ -313,10 +263,10 @@ class Fan(FanBase):
         """
         if self.is_psu_fan:
             temp_file = PSU_MUX_HWMON_PATH.format( (self.fan_tray_index+1) + 75 )
-            return self.__fru_decode_product_model(self.__read_eeprom_sysfs(temp_file, "eeprom"))
+            return self._api_helper.fru_decode_product_model(self._api_helper.read_eeprom_sysfs(temp_file, "eeprom"))
         
         temp_file = FAN_MUX_HWMON_PATH.format( (self.fan_tray_index+1) * 2 )
-        return self.__fru_decode_product_model(self.__read_eeprom_sysfs(temp_file, "eeprom"))
+        return self._api_helper.fru_decode_product_model(self._api_helper.read_eeprom_sysfs(temp_file, "eeprom"))
 
     def get_serial(self):
         """
@@ -326,10 +276,10 @@ class Fan(FanBase):
         """
         if self.is_psu_fan:
             temp_file = PSU_MUX_HWMON_PATH.format( (self.fan_tray_index+1) + 75 )
-            return self.__fru_decode_product_serial(self.__read_eeprom_sysfs(temp_file, "eeprom"))
+            return self._api_helper.fru_decode_product_serial(self._api_helper.read_eeprom_sysfs(temp_file, "eeprom"))
 
         temp_file = FAN_MUX_HWMON_PATH.format( (self.fan_tray_index+1) * 2 )
-        return self.__fru_decode_product_serial(self.__read_eeprom_sysfs(temp_file, "eeprom"))
+        return self._api_helper.fru_decode_product_serial(self._api_helper.read_eeprom_sysfs(temp_file, "eeprom"))
 
     def get_status(self):
         """
