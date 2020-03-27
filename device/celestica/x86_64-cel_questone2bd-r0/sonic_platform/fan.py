@@ -21,6 +21,7 @@ except ImportError as e:
 
 FAN_NAME_LIST = ["FAN-1F", "FAN-1R", "FAN-2F",
                  "FAN-2R", "FAN-3F", "FAN-3R", "FAN-4F", "FAN-4R"]
+
 FAN_SYSFS_PATH = "/sys/bus/i2c/drivers/fancpld/66-000d/"
 FAN_DIRECTION_BIT = 1
 FAN_PRESENT_BIT = 1
@@ -49,6 +50,7 @@ PSU_I2C_MAPPING = {
 }
 
 FAN_MUX_HWMON_PATH = "/sys/bus/i2c/devices/i2c-66/i2c-{0}/{0}-0050/"
+PSU_MUX_HWMON_PATH = "/sys/bus/i2c/devices/i2c-68/i2c-{0}/{0}-0050/"
 
 class Fan(FanBase):
     """Platform-specific Fan class"""
@@ -110,7 +112,7 @@ class Fan(FanBase):
         else:
             return None
 
-    def __fru_decode_product_modle(self, data):
+    def __fru_decode_product_model(self, data):
         if data[4] != 00:
             start_product_info = ord(data[4]) * 8
             start_format_version = start_product_info
@@ -310,10 +312,11 @@ class Fan(FanBase):
             string: Model/part number of device
         """
         if self.is_psu_fan:
-            return "Unknown"
+            temp_file = PSU_MUX_HWMON_PATH.format( (self.fan_tray_index+1) + 75 )
+            return self.__fru_decode_product_model(self.__read_eeprom_sysfs(temp_file, "eeprom"))
         
         temp_file = FAN_MUX_HWMON_PATH.format( (self.fan_tray_index+1) * 2 )
-        return self.__fru_decode_product_modle(self.__read_eeprom_sysfs(temp_file, "eeprom"))
+        return self.__fru_decode_product_model(self.__read_eeprom_sysfs(temp_file, "eeprom"))
 
     def get_serial(self):
         """
@@ -322,7 +325,8 @@ class Fan(FanBase):
             string: Serial number of device
         """
         if self.is_psu_fan:
-            return "Unknown"
+            temp_file = PSU_MUX_HWMON_PATH.format( (self.fan_tray_index+1) + 75 )
+            return self.__fru_decode_product_serial(self.__read_eeprom_sysfs(temp_file, "eeprom"))
 
         temp_file = FAN_MUX_HWMON_PATH.format( (self.fan_tray_index+1) * 2 )
         return self.__fru_decode_product_serial(self.__read_eeprom_sysfs(temp_file, "eeprom"))
