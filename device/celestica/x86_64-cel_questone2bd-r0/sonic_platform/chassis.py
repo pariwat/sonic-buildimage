@@ -15,12 +15,6 @@ try:
     import subprocess
     import json
     from sonic_platform_base.chassis_base import ChassisBase
-    from sonic_platform.component import Component
-    from sonic_platform.eeprom import Eeprom
-    from sonic_platform.fan import Fan
-    from sonic_platform.sfp import Sfp
-    from sonic_platform.psu import Psu
-    from sonic_platform.thermal import Thermal
     from helper import APIHelper
 except ImportError as e:
     raise ImportError(str(e) + "- required module not found")
@@ -44,29 +38,51 @@ class Chassis(ChassisBase):
 
     def __init__(self):
         ChassisBase.__init__(self)
-        self._eeprom = Eeprom(TLV_EEPROM_I2C_BUS, TLV_EEPROM_I2C_ADDR)
         self._api_helper = APIHelper()
+        self.sfp_module_initialized = False
+        self.__initialize_components()
 
+        if not self._api_helper.is_host():
+            self.__initialize_psu()
+            self.__initialize_fan()
+            self.__initialize_eeprom()
+            self.__initialize_thermals()
+
+    def __initialize_sfp(self):
+        from sonic_platform.sfp import Sfp
+        for index in range(0, NUM_SFP):
+            sfp = Sfp(index)
+            self._sfp_list.append(sfp)
+        self.sfp_module_initialized = True
+
+    def __initialize_psu(self):
+        from sonic_platform.psu import Psu
         for index in range(0, NUM_PSU):
             psu = Psu(index)
             self._psu_list.append(psu)
 
+    def __initialize_fan(self):
+        from sonic_platform.fan import Fan
         for fant_index in range(0, NUM_FAN_TRAY):
             for fan_index in range(0, NUM_FAN):
                 fan = Fan(fant_index, fan_index)
                 self._fan_list.append(fan)
 
-        for index in range(0, NUM_SFP):
-            sfp = Sfp(index)
-            self._sfp_list.append(sfp)
-
-        for index in range(0, NUM_COMPONENT):
-            component = Component(index)
-            self._component_list.append(component)
-
+    def __initialize_thermals(self):
+        from sonic_platform.thermal import Thermal
         for index in range(0, NUM_THERMAL):
             thermal = Thermal(index)
             self._thermal_list.append(thermal)
+
+    def __initialize_eeprom(self):
+        from sonic_platform.eeprom import Eeprom
+        self._eeprom = Eeprom(TLV_EEPROM_I2C_BUS, TLV_EEPROM_I2C_ADDR)
+
+    def __initialize_components(self):
+        from sonic_platform.component import Component
+        for index in range(0, NUM_COMPONENT):
+            component = Component(index)
+            self._component_list.append(component)
 
     def get_base_mac(self):
         """
@@ -134,6 +150,33 @@ class Chassis(ChassisBase):
 
         return (reboot_cause, description)
 
+    ##############################################################
+    ######################## SFP methods #########################
+    ##############################################################
+
+    def get_num_sfps(self):
+        """
+        Retrieves the number of sfps available on this chassis
+        Returns:
+            An integer, the number of sfps available on this chassis
+        """
+        if not self.sfp_module_initialized:
+            self.__initialize_sfp()
+
+        return len(self._sfp_list)
+
+    def get_all_sfps(self):
+        """
+        Retrieves all sfps available on this chassis
+        Returns:
+            A list of objects derived from SfpBase representing all sfps
+            available on this chassis
+        """
+        if not self.sfp_module_initialized:
+            self.__initialize_sfp()
+
+        return self._sfp_list
+
     def get_sfp(self, index):
         """
         Retrieves sfp represented by (1-based) index <index>
@@ -146,6 +189,8 @@ class Chassis(ChassisBase):
             An object dervied from SfpBase representing the specified sfp
         """
         sfp = None
+        if not self.sfp_module_initialized:
+            self.__initialize_sfp()
 
         try:
             # The index will start from 1
@@ -154,6 +199,10 @@ class Chassis(ChassisBase):
             sys.stderr.write("SFP index {} out of range (1-{})\n".format(
                              index, len(self._sfp_list)))
         return sfp
+
+    ##############################################################
+    ####################### Other methods ########################
+    ##############################################################
 
     def get_watchdog(self):
         """
@@ -178,7 +227,7 @@ class Chassis(ChassisBase):
             Returns:
             string: The name of the device
         """
-        return self._eeprom.get_product()
+        return self._api_helper.hwsku
 
     def get_presence(self):
         """
