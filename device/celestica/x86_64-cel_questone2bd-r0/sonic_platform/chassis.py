@@ -69,6 +69,14 @@ class Chassis(ChassisBase):
             thermal = Thermal(index)
             self._thermal_list.append(thermal)
 
+        # Initial Interrup MASK for QSFP, QSFPDD
+        PATH_QSFP_SYSFS = "/sys/devices/platform/cls-xcvr/QSFP{0}/interrupt_mask"
+        PATH_QSFPDD_SYSFS = "/sys/devices/platform/cls-xcvr/QSFPDD{0}/interrupt_mask"
+        for i in range(NUM_QSFP):
+            self._api_helper.write_hex_value(PATH_QSFP_SYSFS.format(i+1), 255)
+        for i in range(NUM_QSFPDD):
+            self._api_helper.write_hex_value(PATH_QSFPDD_SYSFS.format(i+1), 255)
+
     def get_base_mac(self):
         """
         Retrieves the base MAC address for the chassis
@@ -200,69 +208,68 @@ class Chassis(ChassisBase):
     ##############################################################
     ###################### Event methods ########################
     ##############################################################       
-    def __check_all_event_status(self):
+    def __clear_interrupt(self, name): 
+        PATH_QSFP_SYSFS = "/sys/devices/platform/cls-xcvr/{0}/interrupt"
+        self._api_helper.write_hex_value(PATH_QSFP_SYSFS.format(name),255)
+        time.sleep(0.5)
+        self._api_helper.write_hex_value(PATH_QSFP_SYSFS.format(name),0)
+        return self._api_helper.read_txt_file(PATH_QSFP_SYSFS.format(name))
+
+    def __check_devices_status(self, name):
+        PATH_QSFP_SYSFS = "/sys/devices/platform/cls-xcvr/{0}/qsfp_modprsL"
+        return self._api_helper.read_txt_file(PATH_QSFP_SYSFS.format(name))
+
+    def __compare_event_object(self, interrup_devices):
+        QSFP_devices = {}
+        QSFPDD_devices = {}
+        json_obj = {}
+
+        for device_name in interrup_devices:
+            if "QSFP" in device_name:
+                QSFP_devices[device_name] = 1 - int(self.__check_devices_status(device_name))
+            if "QSFPDD" in device_name:
+                QSFPDD_devices[device_name] = 1 - int(self.__check_devices_status(device_name))
+            self.__clear_interrupt(device_name)
+
+        if len(QSFP_devices):
+            json_obj['qsfp'] = QSFP_devices
+        if len(QSFPDD_devices):
+            json_obj['qsfp-dd'] = QSFPDD_devices
+        return json.dumps(json_obj)
+
+    def __check_all_interrupt_event(self):
+        interrup_device = {}
+
         QSFP_NAME = "QSFP{0}"
         QSFPDD_NAME = "QSFPDD{0}"
-        PATH_QSFP_SYSFS = "/sys/devices/platform/cls-xcvr/QSFP{0}/qsfp_modprsL"
-        PATH_QSFPDD_SYSFS = "/sys/devices/platform/cls-xcvr/QSFPDD{0}/qsfp_modprsL"
-        self.devices = []
-        for i in range(NUM_QSFP):
-            self.devices.append([QSFP_NAME.format(i+1),self._api_helper.read_txt_file(PATH_QSFP_SYSFS.format(i+1))])
-            # print "Devices: {0} {1}".format(self.devices[i][0], self.devices[i][1])
-        for i in range(NUM_QSFPDD):
-            self.devices.append([QSFPDD_NAME.format(i+1),self._api_helper.read_txt_file(PATH_QSFPDD_SYSFS.format(i+1))])
-            # print "Devices: {0} {1}".format(self.devices[i+NUM_QSFP][0], self.devices[i][1])
-
-        return self.devices
-
-    def __compare_event_object(self,event_def, event_cur):
-        diff_devices = {}
-        json_obj = {}
+        PATH_QSFP_SYSFS = "/sys/devices/platform/cls-xcvr/QSFP{0}/interrupt"
+        PATH_QSFPDD_SYSFS = "/sys/devices/platform/cls-xcvr/QSFPDD{0}/interrupt"
 
         for i in range(NUM_QSFP):
-            if event_def[i][1] != event_cur[i][1]:
-                json_obj[i] = event_cur[i][1]
-        if len(json_obj):
-            diff_devices['qsfp'] = json_obj
-
-        # Clear json object
-        json_obj = {}
+            if self._api_helper.read_txt_file(PATH_QSFP_SYSFS.format(i+1)) != '0x00':
+                interrup_device[QSFP_NAME.format(i+1)] = 1
 
         for i in range(NUM_QSFPDD):
-            i += NUM_QSFP
-            if event_def[i][1] != event_cur[i][1]:
-                json_obj[i-NUM_QSFP+1] = event_cur[i][1]
-        if len(json_obj):
-            diff_devices['qsfp-dd'] = json_obj
-
-        return json.dumps(diff_devices)
+            if self._api_helper.read_txt_file(PATH_QSFPDD_SYSFS.format(i+1)) != '0x00':
+                interrup_device[QSFPDD_NAME.format(i+1)] = 1
+                
+        return interrup_device
 
     def get_change_event(self, timeout=0):
-        # DUMMY_EVENT=120
         if timeout == 0 :
             flag_change = True
-            all_port_status = self.__check_all_event_status()
             while flag_change:
-                currect_port_status = self.__check_all_event_status()
-                if all_port_status == currect_port_status:
-                    time.sleep(0.5)
-                else:
+                interrup_device = self.__check_all_interrupt_event()
+                if len(interrup_device):
                     flag_change = False
-
-                # DUMMY EVEN, Please remove it if sysfs updated.
-                # DUMMY_EVENT -= 1
-                # if DUMMY_EVENT == 0 :
-                #     flag_change = False
-                #     currect_port_status[2][1] = 1
-
-            return (True , self.__compare_event_object(all_port_status, currect_port_status))
+                else:
+                    time.sleep(0.5)
+            return (True , self.__compare_event_object(interrup_device))
         else:
             device_list_change = {}
-            all_port_status = self.__check_all_event_status()
             while timeout:
-                currect_port_status = self.__check_all_event_status()
-                if all_port_status == currect_port_status:
-                     time.sleep(1)
+                interrup_device = self.__check_all_interrupt_event()
+                time.sleep(1)
                 timeout -= 1;
-                device_list_change = self.__compare_event_object(all_port_status, currect_port_status)
+            device_list_change = self.__compare_event_object(interrup_device)
             return (True , device_list_change)
