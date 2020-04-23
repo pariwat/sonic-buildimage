@@ -8,81 +8,66 @@
 #
 #############################################################################
 
+import sys
+import re
+import os
+import subprocess
+import json
+import time
+
 try:
-    import sys
-    import re
-    import os
-    import subprocess
-    import json
     from sonic_platform_base.chassis_base import ChassisBase
+    # from sonic_platform.component import Component
+    from sonic_platform.eeprom import Tlv
+    from sonic_platform.fan import Fan
+    # from sonic_platform.sfp import Sfp
+    from sonic_platform.psu import Psu
+    from sonic_platform.thermal import Thermal
     from helper import APIHelper
 except ImportError as e:
     raise ImportError(str(e) + "- required module not found")
 
-NUM_FAN_TRAY = 4
+NUM_FAN_TRAY = 7
 NUM_FAN = 2
 NUM_PSU = 2
-NUM_THERMAL = 12
-NUM_SFP = 56
-NUM_COMPONENT = 7
-REBOOT_CAUSE_REG = "0xA106"
-TLV_EEPROM_I2C_BUS = 0
-TLV_EEPROM_I2C_ADDR = 56
+NUM_THERMAL = 14
+NUM_QSFPDD = 6
+NUM_QSFP = 24
+NUM_COMPONENT = 5
 
-BASE_CPLD_PLATFORM = "questone2bd.cpldb"
-BASE_GETREG_PATH = "/sys/devices/platform/{}/getreg".format(BASE_CPLD_PLATFORM)
+IPMI_OEM_NETFN = "0x3A"
+IPMI_GET_REBOOT_CAUSE = "0x03 0x00 0x01 0x06"
 
 
 class Chassis(ChassisBase):
     """Platform-specific Chassis class"""
 
     def __init__(self):
+        self.config_data = {}
         ChassisBase.__init__(self)
+        self._eeprom = Tlv()
         self._api_helper = APIHelper()
-        self.sfp_module_initialized = False
-        self.__initialize_components()
 
-        if not self._api_helper.is_host():
-            self.__initialize_psu()
-            self.__initialize_fan()
-            self.__initialize_eeprom()
-            self.__initialize_thermals()
-
-    def __initialize_sfp(self):
-        from sonic_platform.sfp import Sfp
-        for index in range(0, NUM_SFP):
-            sfp = Sfp(index)
-            self._sfp_list.append(sfp)
-        self.sfp_module_initialized = True
-
-    def __initialize_psu(self):
-        from sonic_platform.psu import Psu
-        for index in range(0, NUM_PSU):
-            psu = Psu(index)
-            self._psu_list.append(psu)
-
-    def __initialize_fan(self):
-        from sonic_platform.fan import Fan
         for fant_index in range(0, NUM_FAN_TRAY):
             for fan_index in range(0, NUM_FAN):
                 fan = Fan(fant_index, fan_index)
                 self._fan_list.append(fan)
 
-    def __initialize_thermals(self):
-        from sonic_platform.thermal import Thermal
+        for index in range(0, NUM_PSU):
+            psu = Psu(index)
+            self._psu_list.append(psu)
+
+        # for index in range(0, NUM_SFP):
+        #     sfp = Sfp(index)
+        #     self._sfp_list.append(sfp)
+
+        # for index in range(0, NUM_COMPONENT):
+        #     component = Component(index)
+        #     self._component_list.append(component)
+
         for index in range(0, NUM_THERMAL):
             thermal = Thermal(index)
             self._thermal_list.append(thermal)
-
-    def __initialize_eeprom(self):
-        from sonic_platform.eeprom import Eeprom
-        self._eeprom = Eeprom(TLV_EEPROM_I2C_BUS, TLV_EEPROM_I2C_ADDR)
-
-    def __initialize_components(self):
-        from sonic_platform.component import Component
-        for index in range(0, NUM_COMPONENT):
-            component = Component(index)
-            self._component_list.append(component)
 
     def get_base_mac(self):
         """
@@ -123,82 +108,33 @@ class Chassis(ChassisBase):
             to pass a description of the reboot cause.
         """
 
-        raw_cause = self._api_helper.get_register_value(
-            BASE_GETREG_PATH, REBOOT_CAUSE_REG)
-        hx_cause = raw_cause.lower()
+        status, raw_cause = self._api_helper.ipmi_raw(
+            IPMI_OEM_NETFN, IPMI_GET_REBOOT_CAUSE)
+        hx_cause = raw_cause.split()[0] if status and len(
+            raw_cause.split()) > 0 else 00
         reboot_cause = {
-            "0x00": self.REBOOT_CAUSE_HARDWARE_OTHER,
-            "0x11": self.REBOOT_CAUSE_POWER_LOSS,
-            "0x22": self.REBOOT_CAUSE_NON_HARDWARE,
-            "0x33": self.REBOOT_CAUSE_HARDWARE_OTHER,
-            "0x44": self.REBOOT_CAUSE_NON_HARDWARE,
-            "0x55": self.REBOOT_CAUSE_NON_HARDWARE,
-            "0x66": self.REBOOT_CAUSE_WATCHDOG,
-            "0x77": self.REBOOT_CAUSE_NON_HARDWARE
+            "00": self.REBOOT_CAUSE_HARDWARE_OTHER,
+            "11": self.REBOOT_CAUSE_POWER_LOSS,
+            "22": self.REBOOT_CAUSE_NON_HARDWARE,
+            "33": self.REBOOT_CAUSE_HARDWARE_OTHER,
+            "44": self.REBOOT_CAUSE_NON_HARDWARE,
+            "55": self.REBOOT_CAUSE_NON_HARDWARE,
+            "66": self.REBOOT_CAUSE_WATCHDOG,
+            "77": self.REBOOT_CAUSE_NON_HARDWARE
         }.get(hx_cause, self.REBOOT_CAUSE_HARDWARE_OTHER)
 
         description = {
-            "0x00": "Unknown reason",
-            "0x11": "The last reset is Power on reset",
-            "0x22": "The last reset is soft-set CPU warm reset",
-            "0x33": "The last reset is soft-set CPU cold reset",
-            "0x44": "The last reset is CPU warm reset",
-            "0x55": "The last reset is CPU cold reset",
-            "0x66": "The last reset is watchdog reset",
-            "0x77": "The last reset is power cycle reset"
+            "00": "Unknown reason",
+            "11": "The last reset is Power on reset",
+            "22": "The last reset is soft-set CPU warm reset",
+            "33": "The last reset is soft-set CPU cold reset",
+            "44": "The last reset is CPU warm reset",
+            "55": "The last reset is CPU cold reset",
+            "66": "The last reset is watchdog reset",
+            "77": "The last reset is power cycle reset"
         }.get(hx_cause, "Unknown reason")
 
         return (reboot_cause, description)
-
-    ##############################################################
-    ######################## SFP methods #########################
-    ##############################################################
-
-    def get_num_sfps(self):
-        """
-        Retrieves the number of sfps available on this chassis
-        Returns:
-            An integer, the number of sfps available on this chassis
-        """
-        if not self.sfp_module_initialized:
-            self.__initialize_sfp()
-
-        return len(self._sfp_list)
-
-    def get_all_sfps(self):
-        """
-        Retrieves all sfps available on this chassis
-        Returns:
-            A list of objects derived from SfpBase representing all sfps
-            available on this chassis
-        """
-        if not self.sfp_module_initialized:
-            self.__initialize_sfp()
-
-        return self._sfp_list
-
-    def get_sfp(self, index):
-        """
-        Retrieves sfp represented by (1-based) index <index>
-        Args:
-            index: An integer, the index (1-based) of the sfp to retrieve.
-            The index should be the sequence of a physical port in a chassis,
-            starting from 1.
-            For example, 1 for Ethernet0, 2 for Ethernet4 and so on.
-        Returns:
-            An object dervied from SfpBase representing the specified sfp
-        """
-        sfp = None
-        if not self.sfp_module_initialized:
-            self.__initialize_sfp()
-
-        try:
-            # The index will start from 1
-            sfp = self._sfp_list[index-1]
-        except IndexError:
-            sys.stderr.write("SFP index {} out of range (1-{})\n".format(
-                             index, len(self._sfp_list)))
-        return sfp
 
     ##############################################################
     ####################### Other methods ########################
@@ -260,3 +196,73 @@ class Chassis(ChassisBase):
             A boolean value, True if device is operating properly, False if not
         """
         return True
+
+    ##############################################################
+    ###################### Event methods ########################
+    ##############################################################       
+    def __check_all_event_status(self):
+        QSFP_NAME = "QSFP{0}"
+        QSFPDD_NAME = "QSFPDD{0}"
+        PATH_QSFP_SYSFS = "/sys/devices/platform/cls-xcvr/QSFP{0}/qsfp_modprsL"
+        PATH_QSFPDD_SYSFS = "/sys/devices/platform/cls-xcvr/QSFPDD{0}/qsfp_modprsL"
+        self.devices = []
+        for i in range(NUM_QSFP):
+            self.devices.append([QSFP_NAME.format(i+1),self._api_helper.read_txt_file(PATH_QSFP_SYSFS.format(i+1))])
+            # print "Devices: {0} {1}".format(self.devices[i][0], self.devices[i][1])
+        for i in range(NUM_QSFPDD):
+            self.devices.append([QSFPDD_NAME.format(i+1),self._api_helper.read_txt_file(PATH_QSFPDD_SYSFS.format(i+1))])
+            # print "Devices: {0} {1}".format(self.devices[i+NUM_QSFP][0], self.devices[i][1])
+
+        return self.devices
+
+    def __compare_event_object(self,event_def, event_cur):
+        diff_devices = {}
+        json_obj = {}
+
+        for i in range(NUM_QSFP):
+            if event_def[i][1] != event_cur[i][1]:
+                json_obj[i] = event_cur[i][1]
+        if len(json_obj):
+            diff_devices['qsfp'] = json_obj
+
+        # Clear json object
+        json_obj = {}
+
+        for i in range(NUM_QSFPDD):
+            i += NUM_QSFP
+            if event_def[i][1] != event_cur[i][1]:
+                json_obj[i-NUM_QSFP+1] = event_cur[i][1]
+        if len(json_obj):
+            diff_devices['qsfp-dd'] = json_obj
+
+        return json.dumps(diff_devices)
+
+    def get_change_event(self, timeout=0):
+        # DUMMY_EVENT=120
+        if timeout == 0 :
+            flag_change = True
+            all_port_status = self.__check_all_event_status()
+            while flag_change:
+                currect_port_status = self.__check_all_event_status()
+                if all_port_status == currect_port_status:
+                    time.sleep(0.5)
+                else:
+                    flag_change = False
+
+                # DUMMY EVEN, Please remove it if sysfs updated.
+                # DUMMY_EVENT -= 1
+                # if DUMMY_EVENT == 0 :
+                #     flag_change = False
+                #     currect_port_status[2][1] = 1
+
+            return (True , self.__compare_event_object(all_port_status, currect_port_status))
+        else:
+            device_list_change = {}
+            all_port_status = self.__check_all_event_status()
+            while timeout:
+                currect_port_status = self.__check_all_event_status()
+                if all_port_status == currect_port_status:
+                     time.sleep(1)
+                timeout -= 1;
+                device_list_change = self.__compare_event_object(all_port_status, currect_port_status)
+            return (True , device_list_change)
