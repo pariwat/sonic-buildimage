@@ -32,6 +32,9 @@
 #  *                 Default: yes
 #  *                 Values:  yes, no
 #  * KERNEL_PROCURE_METHOD: Specifying method of obtaining kernel Debian package: download or build
+#  * TELEMETRY_WRITABLE: Enable write/config operations via the gNMI interface.
+#  *                 Default: unset
+#  *                 Values: y
 #  * SONIC_DPKG_CACHE_METHOD: Specifying method of obtaining the Debian packages from cache: none or cache
 #  * SONIC_DPKG_CACHE_SOURCE: Debian package cache location when cache enabled for debian packages
 #  * BUILD_LOG_TIMESTAMP: Set timestamp in the build log (simple/none)
@@ -183,7 +186,7 @@ SONIC_BUILD_INSTRUCTION :=  make \
                            INSTALL_KUBERNETES=$(INSTALL_KUBERNETES) \
                            KUBERNETES_VERSION=$(KUBERNETES_VERSION) \
                            K8s_GCR_IO_PAUSE_VERSION=$(K8s_GCR_IO_PAUSE_VERSION) \
-                           K8s_CNI_CALICO_VERSION=$(K8s_CNI_CALICO_VERSION) \
+                           K8s_CNI_FLANNEL_VERSION=$(K8s_CNI_FLANNEL_VERSION) \
                            SONIC_ENABLE_PFCWD_ON_START=$(ENABLE_PFCWD_ON_START) \
                            SONIC_ENABLE_SYNCD_RPC=$(ENABLE_SYNCD_RPC) \
                            SONIC_INSTALL_DEBUG_TOOLS=$(INSTALL_DEBUG_TOOLS) \
@@ -200,8 +203,10 @@ SONIC_BUILD_INSTRUCTION :=  make \
                            HTTPS_PROXY=$(https_proxy) \
                            SONIC_ENABLE_SYSTEM_TELEMETRY=$(ENABLE_SYSTEM_TELEMETRY) \
                            SONIC_ENABLE_RESTAPI=$(ENABLE_RESTAPI) \
+                           TELEMETRY_WRITABLE=$(TELEMETRY_WRITABLE) \
                            EXTRA_DOCKER_TARGETS=$(EXTRA_DOCKER_TARGETS) \
                            BUILD_LOG_TIMESTAMP=$(BUILD_LOG_TIMESTAMP) \
+                           SONIC_ENABLE_IMAGE_SIGNATURE=$(ENABLE_IMAGE_SIGNATURE) \
                            $(SONIC_OVERRIDE_BUILD_VARS)
 
 .PHONY: sonic-slave-build sonic-slave-bash init reset
@@ -251,6 +256,16 @@ sonic-slave-bash :
 	    $(DOCKER_BUILD) ; }
 	@$(DOCKER_RUN) -t $(SLAVE_IMAGE):$(SLAVE_TAG) bash
 
+sonic-slave-run :
+	@$(OVERLAY_MODULE_CHECK)
+	@docker inspect --type image $(SLAVE_BASE_IMAGE):$(SLAVE_BASE_TAG) &> /dev/null || \
+	    { echo Image $(SLAVE_BASE_IMAGE):$(SLAVE_BASE_TAG) not found. Building... ; \
+	    $(DOCKER_BASE_BUILD) ; }
+	@docker inspect --type image $(SLAVE_IMAGE):$(SLAVE_TAG) &> /dev/null || \
+	    { echo Image $(SLAVE_IMAGE):$(SLAVE_TAG) not found. Building... ; \
+	    $(DOCKER_BUILD) ; }
+	@$(DOCKER_RUN) $(SLAVE_IMAGE):$(SLAVE_TAG) bash -c "$(SONIC_RUN_CMDS)"
+
 showtag:
 	@echo $(SLAVE_IMAGE):$(SLAVE_TAG)
 	@echo $(SLAVE_BASE_IMAGE):$(SLAVE_BASE_TAG)
@@ -273,8 +288,8 @@ reset :
 	        fi
 	        git clean -xfdf;
 	        git reset --hard;
-	        git submodule foreach --recursive git clean -xfdf;
-	        git submodule foreach --recursive git reset --hard;
+	        git submodule foreach --recursive 'git clean -xfdf || true';
+	        git submodule foreach --recursive 'git reset --hard || true';
 	        git submodule update --init --recursive;
 	        echo "Reset complete!";
 	    else

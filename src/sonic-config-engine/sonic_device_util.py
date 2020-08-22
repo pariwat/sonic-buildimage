@@ -3,6 +3,9 @@ import os
 import yaml
 import subprocess
 import re
+from natsort import natsorted
+import glob
+from swsssdk import ConfigDBConnector, SonicDBConfig
 
 DOCUMENTATION = '''
 ---
@@ -17,6 +20,12 @@ description:
 TODO: this file shall be renamed and moved to other places in future
 to have it shared with multiple applications. 
 '''
+SONIC_DEVICE_PATH = '/usr/share/sonic/device'
+NPU_NAME_PREFIX = 'asic'
+NAMESPACE_PATH_GLOB = '/run/netns/*'
+ASIC_CONF_FILENAME = 'asic.conf'
+FRONTEND_ASIC_SUB_ROLE = 'FrontEnd'
+BACKEND_ASIC_SUB_ROLE = 'BackEnd'
 def get_machine_info():
     if not os.path.isfile('/host/machine.conf'):
         return None
@@ -27,7 +36,86 @@ def get_machine_info():
             if len(tokens) < 2:
                 continue
             machine_vars[tokens[0]] = tokens[1].strip()
-    return machine_vars
+    return machine_vars 
+
+def get_npu_id_from_name(npu_name):
+    if npu_name.startswith(NPU_NAME_PREFIX):
+        return npu_name[len(NPU_NAME_PREFIX):]
+    else:
+        return None
+
+def get_num_npus():
+    platform = get_platform_info(get_machine_info())
+    if not platform:
+        return 1
+    asic_conf_file_path = os.path.join(SONIC_DEVICE_PATH, platform, ASIC_CONF_FILENAME)
+    if not os.path.isfile(asic_conf_file_path):
+        return 1
+    with open(asic_conf_file_path) as asic_conf_file:
+        for line in asic_conf_file:
+            tokens = line.split('=')
+            if len(tokens) < 2:
+               continue
+            if tokens[0].lower() == 'num_asic':
+                num_npus = tokens[1].strip()
+        return int(num_npus)
+
+def get_namespaces():
+    """
+    In a multi NPU platform, each NPU is in a Linux Namespace.
+    This method returns list of all the Namespace present on the device
+    """
+    ns_list = []
+    for path in glob.glob(NAMESPACE_PATH_GLOB):
+        ns = os.path.basename(path)
+        ns_list.append(ns)
+    return natsorted(ns_list)
+
+def get_hwsku():
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    metadata = config_db.get_table('DEVICE_METADATA')
+    return metadata['localhost']['hwsku']
+
+def get_platform():
+    if not os.path.isfile('/host/machine.conf'):
+        return ''
+ 
+    with open('/host/machine.conf') as machine_conf:
+        for line in machine_conf:
+            tokens = line.split('=')
+            if tokens[0].strip() == 'onie_platform' or tokens[0].strip() == 'aboot_platform':
+                return tokens[1].strip()
+    return ''
+
+def is_multi_npu():
+    num_npus = get_num_npus()
+    return (num_npus > 1)
+
+def get_all_namespaces():
+    """
+    In case of Multi-Asic platform, Each ASIC will have a linux network namespace created.
+    So we loop through the databases in different namespaces and depending on the sub_role
+    decide whether this is a front end ASIC/namespace or a back end one.
+    """
+    front_ns = []
+    back_ns = []
+    num_npus = get_num_npus()
+    SonicDBConfig.load_sonic_global_db_config()
+    
+    if is_multi_npu():
+        for npu in range(num_npus):
+            namespace = "{}{}".format(NPU_NAME_PREFIX, npu)
+            config_db = ConfigDBConnector(use_unix_socket_path=True, namespace=namespace)
+            config_db.connect()
+
+            metadata = config_db.get_table('DEVICE_METADATA')
+            if metadata['localhost']['sub_role'] == FRONTEND_ASIC_SUB_ROLE:
+                front_ns.append(namespace)
+            elif metadata['localhost']['sub_role'] == BACKEND_ASIC_SUB_ROLE:
+                back_ns.append(namespace)
+
+    return {'front_ns':front_ns, 'back_ns':back_ns}
 
 def get_platform_info(machine_info):
     if machine_info != None:
@@ -51,7 +139,7 @@ def get_sonic_version_info():
 def valid_mac_address(mac):
     return bool(re.match("^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", mac))
 
-def get_system_mac():
+def get_system_mac(namespace=None):
     version_info = get_sonic_version_info()
 
     if (version_info['asic_type'] == 'mellanox'):
@@ -73,10 +161,14 @@ def get_system_mac():
         # Try valid mac in eeprom, else fetch it from eth0
         platform = get_platform_info(get_machine_info())
         hwsku = get_machine_info()['onie_machine']
-        profile_cmd = 'cat /usr/share/sonic/device/' + platform +'/'+ hwsku +'/profile.ini | cut -f2 -d='
+        profile_cmd = 'cat' + SONIC_DEVICE_PATH + '/' + platform +'/'+ hwsku +'/profile.ini | grep switchMacAddress | cut -f2 -d='
         hw_mac_entry_cmds = [ profile_cmd, "sudo decode-syseeprom -m", "ip link show eth0 | grep ether | awk '{print $2}'" ]
     else:
-        hw_mac_entry_cmds = [ "ip link show eth0 | grep ether | awk '{print $2}'" ]
+        mac_address_cmd = "cat /sys/class/net/eth0/address"
+        if namespace is not None:
+            mac_address_cmd = "sudo ip netns exec {} {}".format(namespace, mac_address_cmd)
+       
+        hw_mac_entry_cmds = [mac_address_cmd]
 
     for get_mac_cmd in hw_mac_entry_cmds:
         proc = subprocess.Popen(get_mac_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

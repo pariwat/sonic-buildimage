@@ -312,7 +312,7 @@ void scheduler_init()
     iccp_config_from_file(sys->config_file_path);
 
     /*Get kernel ARP info */
-    iccp_arp_get_init();
+    iccp_neigh_get_init();
 
     if (iccp_connect_syncd() < 0)
     {
@@ -731,7 +731,10 @@ int scheduler_unregister_sock_read_event_callback(struct CSM* csm)
         return MCLAG_ERROR;
     }
 
-    FD_CLR(csm->sock_fd, &(sys->readfd));
+    if (csm->sock_fd > 0)
+    {
+        FD_CLR(csm->sock_fd, &(sys->readfd));
+    }
 
     return 0;
 }

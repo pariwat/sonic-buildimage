@@ -124,7 +124,7 @@ thermal_api_names = [
     THERMAL_API_GET_HIGH_THRESHOLD
 ]
 
-hwsku_dict_thermal = {'ACS-MSN2700': 0, 'LS-SN2700':0, 'ACS-MSN2740': 3, 'ACS-MSN2100': 1, 'ACS-MSN2410': 2, 'ACS-MSN2010': 4, 'ACS-MSN3700': 5, 'ACS-MSN3700C': 6, 'Mellanox-SN2700': 0, 'Mellanox-SN2700-D48C8': 0, 'ACS-MSN3800': 7, 'Mellanox-SN3800-D112C8': 7, 'ACS-MSN4700': 8}
+platform_dict_thermal = {'x86_64-mlnx_msn2700-r0': 0, 'x86_64-mlnx_lssn2700-r0':0, 'x86_64-mlnx_msn2740-r0': 3, 'x86_64-mlnx_msn2100-r0': 1, 'x86_64-mlnx_msn2410-r0': 2, 'x86_64-mlnx_msn2010-r0': 4, 'x86_64-mlnx_msn3420-r0':9, 'x86_64-mlnx_msn3700-r0': 5, 'x86_64-mlnx_msn3700c-r0': 6, 'x86_64-mlnx_msn3800-r0': 7, 'x86_64-mlnx_msn4600c-r0':9, 'x86_64-mlnx_msn4700-r0': 8}
 thermal_profile_list = [
     # 2700
     {
@@ -264,13 +264,45 @@ thermal_profile_list = [
                 THERMAL_DEV_FAN_AMBIENT
             ]
         )
+    },
+    # 3420
+    {
+        THERMAL_DEV_CATEGORY_CPU_CORE:(0, 2),
+        THERMAL_DEV_CATEGORY_MODULE:(1, 60),
+        THERMAL_DEV_CATEGORY_PSU:(1, 2),
+        THERMAL_DEV_CATEGORY_CPU_PACK:(0,1),
+        THERMAL_DEV_CATEGORY_GEARBOX:(0,0),
+        THERMAL_DEV_CATEGORY_AMBIENT:(0,
+            [
+                THERMAL_DEV_ASIC_AMBIENT,
+                THERMAL_DEV_COMEX_AMBIENT,
+                THERMAL_DEV_PORT_AMBIENT,
+                THERMAL_DEV_FAN_AMBIENT
+            ]
+        )
+    },
+    # 4600C
+    {
+        THERMAL_DEV_CATEGORY_CPU_CORE:(0, 4),
+        THERMAL_DEV_CATEGORY_MODULE:(1, 64),
+        THERMAL_DEV_CATEGORY_PSU:(1, 2),
+        THERMAL_DEV_CATEGORY_CPU_PACK:(0,1),
+        THERMAL_DEV_CATEGORY_GEARBOX:(0,0),
+        THERMAL_DEV_CATEGORY_AMBIENT:(0,
+            [
+                THERMAL_DEV_ASIC_AMBIENT,
+                THERMAL_DEV_COMEX_AMBIENT,
+                THERMAL_DEV_PORT_AMBIENT,
+                THERMAL_DEV_FAN_AMBIENT
+            ]
+        )
     }
 ]
 
 
-def initialize_thermals(sku, thermal_list, psu_list):
+def initialize_thermals(platform, thermal_list, psu_list):
     # create thermal objects for all categories of sensors
-    tp_index = hwsku_dict_thermal[sku]
+    tp_index = platform_dict_thermal[platform]
     thermal_profile = thermal_profile_list[tp_index]
     Thermal.thermal_profile = thermal_profile
     for category in thermal_device_categories_all:
@@ -463,12 +495,15 @@ class Thermal(ThermalBase):
         We usually disable the algorithm when we want to set a fix speed. E.g, when 
         a fan unit is removed from system, we will set fan speed to 100% and disable 
         the algorithm to avoid it adjust the speed.
+
+        Returns:
+            True if thermal algorithm status changed.
         """
         if not cls.thermal_profile:
             raise Exception("Fail to get thermal profile for this switch")
 
         if not force and cls.thermal_algorithm_status == status:
-            return
+            return False
 
         cls.thermal_algorithm_status = status
         content = "enabled" if status else "disabled"
@@ -489,6 +524,7 @@ class Thermal(ThermalBase):
                 for index in range(count):
                     cls._write_generic_file(join(THERMAL_ZONE_GEARBOX_PATH.format(start + index), THERMAL_ZONE_MODE), content)
                     cls._write_generic_file(join(THERMAL_ZONE_GEARBOX_PATH.format(start + index), THERMAL_ZONE_POLICY), policy)
+        return True
 
     @classmethod
     def check_thermal_zone_temperature(cls):
@@ -551,16 +587,11 @@ class Thermal(ThermalBase):
         return 'trust'
 
     @classmethod
-    def get_air_flow_direction(cls):
+    def get_min_amb_temperature(cls):
         fan_ambient_path = join(HW_MGMT_THERMAL_ROOT, THERMAL_DEV_FAN_AMBIENT)
         port_ambient_path = join(HW_MGMT_THERMAL_ROOT, THERMAL_DEV_PORT_AMBIENT)
 
         # if there is any exception, let it raise
         fan_ambient_temp = int(cls._read_generic_file(fan_ambient_path, 0))
         port_ambient_temp = int(cls._read_generic_file(port_ambient_path, 0))
-        if fan_ambient_temp > port_ambient_temp:
-            return 'p2c', fan_ambient_temp
-        elif fan_ambient_temp < port_ambient_temp:
-            return 'c2p', port_ambient_temp
-        else:
-            return 'unk', fan_ambient_temp
+        return fan_ambient_temp if fan_ambient_temp < port_ambient_temp else port_ambient_temp

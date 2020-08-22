@@ -7,13 +7,12 @@ include $(PLATFORM_PATH)/one-image.mk
 include $(PLATFORM_PATH)/libsaithrift-dev.mk
 include $(PLATFORM_PATH)/docker-ptf-centec.mk
 
-SONIC_ALL += $(SONIC_ONE_IMAGE) \
-             $(DOCKER_SYNCD_CENTEC_RPC)
+SONIC_ALL += $(SONIC_ONE_IMAGE)
 
 # Inject centec sai into sairedis
 $(LIBSAIREDIS)_DEPENDS += $(CENTEC_SAI)
 ifeq ($(ENABLE_SYNCD_RPC),y)
-$(LIBSAIREDIS)_DEPENDS += $(LIBSAITHRIFT_DEV_CENTEC)
+$(LIBSAIREDIS)_DEPENDS += $(LIBSAITHRIFT_DEV)
 endif
 
 # Runtime dependency on centec sai is set only for syncd

@@ -117,7 +117,7 @@ DEFAULT_VS_PREPARE_MEM = yes
 
 
 # ENABLE_ICCPD - build docker-iccpd for mclag support
-ENABLE_ICCPD = y
+ENABLE_ICCPD = n
 
 # ENABLE_SYSTEM_SFLOW - build docker-sonic-sflow for sFlow support
 ENABLE_SFLOW = y
@@ -131,17 +131,27 @@ ENABLE_RESTAPI = n
 # ENABLE_NAT - build docker-sonic-nat for nat support
 ENABLE_NAT = y
 
+# TELEMETRY_WRITABLE - Enable write/config operations via the gNMI interface.
+# Uncomment to enable:
+# TELEMETRY_WRITABLE = y
 # INSTALL_KUBERNETES - if set to y kubernetes packages are installed to be able to
 # run as worker node in kubernetes cluster.
 INSTALL_KUBERNETES = n
 
 # KUBERNETES_VERSION - Set to the required version.
 # K8s_GCR_IO_PAUSE_VERSION - Version of k8s universal pause container image
-# K8s_CNI_CALICO_VERSION - Calico used as CNI; Appropriate version for this Kubernetes version
+# K8s_CNI_FLANNEL_VERSION - Flannel used as CNI; Appropriate version for this Kubernetes version
 # These are Used *only* when INSTALL_KUBERNETES=y
 # NOTE: As a worker node it has to run version compatible to kubernetes master.
 #
 KUBERNETES_VERSION = 1.18.0
 K8s_GCR_IO_PAUSE_VERSION = 3.2
-K8s_CNI_CALICO_VERSION = 3.12.1
+K8s_CNI_FLANNEL_VERSION = v0.12.0
 
+# SONIC_ENABLE_IMAGE_SIGNATURE - enable image signature
+# To not use the auto-generated self-signed certificate, the required files to sign the image as below:
+#     SIGNING_KEY =
+#     SIGNING_CERT =
+#     CA_CERT =
+# The relative path is build root folder.
+SONIC_ENABLE_IMAGE_SIGNATURE ?= n
